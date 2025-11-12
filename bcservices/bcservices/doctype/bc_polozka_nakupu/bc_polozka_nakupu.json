@@ -1,0 +1,52 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-11 21:27:16.233509",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "token",
+  "jednotkova_cena_eur",
+  "rok",
+  "poznamka"
+ ],
+ "fields": [
+  {
+   "fieldname": "token",
+   "fieldtype": "Link",
+   "label": "Token",
+   "options": "BC Token"
+  },
+  {
+   "fieldname": "jednotkova_cena_eur",
+   "fieldtype": "Currency",
+   "label": "Jednotkov\u00e1 cena (EUR)"
+  },
+  {
+   "fieldname": "rok",
+   "fieldtype": "Int",
+   "label": "Rok"
+  },
+  {
+   "fieldname": "poznamka",
+   "fieldtype": "Small Text",
+   "label": "Pozn\u00e1mka"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-11-11 22:55:25.057056",
+ "modified_by": "Administrator",
+ "module": "BCServices",
+ "name": "BC Polozka Nakupu",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

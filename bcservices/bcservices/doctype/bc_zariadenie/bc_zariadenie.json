@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-11 21:14:02.693198",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "voip_token",
+  "apns_token",
+  "poznamka"
+ ],
+ "fields": [
+  {
+   "fieldname": "voip_token",
+   "fieldtype": "Data",
+   "label": "VoIP token",
+   "unique": 1
+  },
+  {
+   "fieldname": "apns_token",
+   "fieldtype": "Data",
+   "label": "APNs token"
+  },
+  {
+   "fieldname": "poznamka",
+   "fieldtype": "Small Text",
+   "label": "Pozn\u00e1mka"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-11-11 22:56:02.328722",
+ "modified_by": "Administrator",
+ "module": "BCServices",
+ "name": "BC Zariadenie",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

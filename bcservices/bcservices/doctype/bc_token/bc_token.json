@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-11 21:16:14.499019",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "minuty_ostavajuce",
+  "stav",
+  "povodna_cena_eur",
+  "vydany_rok",
+  "aktualny_drzitel"
+ ],
+ "fields": [
+  {
+   "fieldname": "minuty_ostavajuce",
+   "fieldtype": "Int",
+   "label": "Min\u00faty ost\u00e1vaj\u00face"
+  },
+  {
+   "fieldname": "stav",
+   "fieldtype": "Select",
+   "label": "Stav",
+   "options": "active\nlisted\nspent"
+  },
+  {
+   "fieldname": "povodna_cena_eur",
+   "fieldtype": "Currency",
+   "label": "P\u00f4vodn\u00e1 cena (EUR)"
+  },
+  {
+   "fieldname": "vydany_rok",
+   "fieldtype": "Int",
+   "label": "Vydan\u00fd rok"
+  },
+  {
+   "fieldname": "aktualny_drzitel",
+   "fieldtype": "Link",
+   "label": "Aktu\u00e1lny dr\u017eite\u013e",
+   "options": "BC Pouzivatel"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-11 22:55:55.301008",
+ "modified_by": "Administrator",
+ "module": "BCServices",
+ "name": "BC Token",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
