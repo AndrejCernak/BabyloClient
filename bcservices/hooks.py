@@ -1,3 +1,5 @@
+from . import __version__ as app_version
+
 app_name = "bcservices"
 app_title = "BCServices"
 app_publisher = "Focus Hub s.r.o"
@@ -10,6 +12,13 @@ app_license = "unlicense"
 
 # required_apps = []
 
+doc_events = {
+    # Keď admin vytvorí BC Pouzivatel vo Frappe, založíme aj usera v Clerku a dáme mu role=client
+    "BC Pouzivatel": {
+        "after_insert": "bcservices.api.auth.after_insert_bc_pouzivatel",
+        "on_update": "bcservices.api.auth.on_update_bc_pouzivatel"
+    }
+}
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
 # 	{
