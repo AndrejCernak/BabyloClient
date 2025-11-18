@@ -19,6 +19,14 @@ doc_events = {
         "on_update": "bcservices.api.auth.on_update_bc_pouzivatel"
     }
 }
+
+override_whitelisted_methods = {
+    "bcservices.api.admin.list_clients": "bcservices.api.admin.list_clients",
+    "bcservices.api.admin.mint": "bcservices.api.admin.mint",
+    "bcservices.api.admin.set_price": "bcservices.api.admin.set_price",
+    "bcservices.api.call.start": "bcservices.api.call.start",
+}
+
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
 # 	{
