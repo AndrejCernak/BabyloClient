@@ -1,23 +1,31 @@
 [project]
 name = "bcservices"
 authors = [
-    { name = "Focus Hub s.r.o", email = "andrejcernakk@gmail.com"}
+    { name = "Focus Hub s.r.o", email = "andrejcernakk@gmail.com" }
 ]
 description = "Custom app for Babylo Client Services"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
+
+# These dependencies WILL be installed by bench (pip)
 dependencies = [
-    # "frappe~=15.0.0" # Installed and managed by bench.
+    # "frappe~=15.0.0",  # Frappe sa neinštaluje tu, bench ho spravuje samostatne
+    "httpx>=0.27.0",
+    "stripe>=10.0.0,<11.0.0",
+    "PyJWT>=2.9.0,<3.0.0",
+    "cryptography>=43.0.0,<44.0.0",
+    "requests>=2.32.0,<3.0.0",
+    "apns2>=0.7.2,<0.8.0"
 ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
 
-# These dependencies are only installed when developer mode is enabled
+# Development-only dependencies (installed only with bench --dev)
 [tool.bench.dev-dependencies]
-# package_name = "~=1.1.0"
+# sem môžeš pridať dev nástroje ak treba
 
 [tool.ruff]
 line-length = 110
@@ -25,31 +33,25 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = [
-    "F",
-    "E",
-    "W",
-    "I",
-    "UP",
-    "B",
-    "RUF",
+    "F", "E", "W", "I", "UP", "B", "RUF",
 ]
 ignore = [
-    "B017", # assertRaises(Exception) - should be more specific
-    "B018", # useless expression, not assigned to anything
-    "B023", # function doesn't bind loop variable - will have last iteration's value
-    "B904", # raise inside except without from
-    "E101", # indentation contains mixed spaces and tabs
-    "E402", # module level import not at top of file
-    "E501", # line too long
-    "E741", # ambiguous variable name
-    "F401", # "unused" imports
-    "F403", # can't detect undefined names from * import
-    "F405", # can't detect undefined names from * import
-    "F722", # syntax error in forward type annotation
-    "W191", # indentation contains tabs
-    "UP030", # Use implicit references for positional format fields (translations)
-    "UP031", # Use format specifiers instead of percent format
-    "UP032", # Use f-string instead of `format` call (translations)
+    "B017",
+    "B018",
+    "B023",
+    "B904",
+    "E101",
+    "E402",
+    "E501",
+    "E741",
+    "F401",
+    "F403",
+    "F405",
+    "F722",
+    "W191",
+    "UP030",
+    "UP031",
+    "UP032",
 ]
 typing-modules = ["frappe.types.DF"]
 
@@ -57,10 +59,3 @@ typing-modules = ["frappe.types.DF"]
 quote-style = "double"
 indent-style = "tab"
 docstring-code-format = true
-
-[tool.poetry.dependencies]
-stripe = "^10.0.0"
-PyJWT = "^2.9.0"
-cryptography = "^43.0.0"
-requests = "^2.32.0"
-apns2 = "^0.7.2"
