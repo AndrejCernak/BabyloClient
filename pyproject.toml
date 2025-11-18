@@ -15,8 +15,7 @@ dependencies = [
     "stripe>=10.0.0,<11.0.0",
     "PyJWT>=2.9.0,<3.0.0",
     "cryptography>=43.0.0,<44.0.0",
-    "requests>=2.32.0,<3.0.0",
-    "apns2>=0.7.2,<0.8.0"
+    "requests>=2.32.0,<3.0.0"
 ]
 
 [build-system]
