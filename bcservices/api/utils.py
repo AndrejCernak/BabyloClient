@@ -29,19 +29,36 @@ def _jwks_client():
     return PyJWKClient(url)
 
 def verify_clerk_bearer_and_get_sub():
-    auth = frappe.get_request_header("Authorization") or frappe.get_request_header("authorization")
-    if not auth or not auth.startswith("Bearer "):
-        frappe.throw("Missing Authorization header", frappe.PermissionError)
-    token = auth.split(" ", 1)[1]
+    # Najprv hľadáme vlastný header, aby Frappe ignoroval Authorization
+    auth = (
+        frappe.get_request_header("X-Clerk-Authorization")
+        or frappe.get_request_header("x-clerk-authorization")
+    )
+
+    # Ak by si náhodou ešte niekde používal "Authorization", fallback:
+    if not auth:
+        auth = (
+            frappe.get_request_header("Authorization")
+            or frappe.get_request_header("authorization")
+        )
+
+    if not auth:
+        frappe.throw("Missing Clerk auth header", frappe.PermissionError)
+
+    # podporí "Bearer xxx" aj čisté "xxx"
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+    else:
+        token = auth.strip()
+
     try:
         signing_key = _jwks_client().get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=None,               # Clerk sessions nemusia mať aud
             issuer=_clerk_issuer(),
-            options={"verify_aud": False}
+            options={"verify_aud": False},
         )
         return payload.get("sub"), payload
     except Exception as e:
