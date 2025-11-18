@@ -11,7 +11,7 @@ def _require_admin():
         frappe.throw("Forbidden", frappe.PermissionError)
     return clerk_id
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist()
 def list_clients():
     _require_admin()
     # prehľad: klient + devices + tokens
