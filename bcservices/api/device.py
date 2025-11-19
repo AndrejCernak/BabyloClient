@@ -2,21 +2,26 @@
 import frappe
 from .utils import verify_clerk_bearer_and_get_sub, ensure_bc_user_by_clerk, upsert_child_device_for_user
 
-@frappe.whitelist(methods=["POST"])
-def register_device(userId: str = None, voipToken: str = None, apnsToken: str = None):
-    """Body: { userId, voipToken [, apnsToken] } – userId je Clerk ID (ako v tvojom Node)."""
-    data = frappe.local.form_dict
-    userId = userId or data.get("userId")
-    voipToken = voipToken or data.get("voipToken")
-    apnsToken = apnsToken or data.get("apnsToken")
+@frappe.whitelist(methods=["POST"], allow_guest=True)
+def register_device():
+    """Register user VoIP token (iOS)."""
+    clerk_id, payload = verify_clerk_bearer_and_get_sub()
 
-    if not userId or not voipToken:
-        frappe.throw("Missing userId or voipToken", frappe.ValidationError)
+    data = frappe.local.form_dict or {}
+    voip_token = data.get("voip_token") or data.get("voipToken")
 
-    user = ensure_bc_user_by_clerk(userId)
-    upsert_child_device_for_user(user, voip_token=voipToken, apns_token=apnsToken)
+    if not voip_token:
+        frappe.throw("Missing voip_token")
 
-    # vráť posledný záznam device (ak chceš)
-    devices = frappe.get_all("BC Zariadenie", filters={"parent": user.name},
-                             fields=["voip_token","apns_token","modified"], order_by="modified desc")
-    return {"ok": True, "device": devices[0] if devices else None}
+    existing = frappe.db.get_value("BC Device", {"clerk_id": clerk_id})
+
+    if existing:
+        doc = frappe.get_doc("BC Device", existing)
+    else:
+        doc = frappe.new_doc("BC Device")
+        doc.clerk_id = clerk_id
+
+    doc.voip_token = voip_token
+    doc.save(ignore_permissions=True)
+
+    return {"success": True}
