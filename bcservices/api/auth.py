@@ -19,7 +19,7 @@ from .utils import (
 # PUBLIC API – iOS / klient
 # -----------------------------------------------------------------------------
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["POST"], allow_guest=True)
 def sync_user():
     """
     iOS -> /api/method/bcservices.api.auth.sync_user  (Authorization: Bearer <Clerk JWT>)
@@ -30,7 +30,6 @@ def sync_user():
     clerk_id, payload = verify_clerk_bearer_and_get_sub()
     doc = ensure_bc_user_by_clerk(clerk_id)
 
-    # nastav role=client v Clerku (idempotentne)
     try:
         u = clerk_api(f"/v1/users/{clerk_id}")
         pub = (u.get("public_metadata") or {})
