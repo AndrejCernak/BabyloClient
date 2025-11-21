@@ -6,7 +6,7 @@ from .utils import (
     ensure_bc_user_by_clerk
 )
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET"]), allow_guest=True)
 def balance(userId: str = None):
     """
     Return total remaining minutes for a user.
