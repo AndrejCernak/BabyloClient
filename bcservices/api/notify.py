@@ -49,7 +49,13 @@ def send_notification():
     if not user_doc:
         return {"success": False, "error": "User not found"}
 
-    # 3. Získame jeho APNs tokeny zo child table 'Zariadenie'
+    # 3. Zvýšime počítadlo neprečítaných pushov pre príjemcu (badge na ikone).
+    #    Appka ho vynuluje cez reset_badge keď ju používateľ otvorí.
+    new_badge = (user_doc.get("unread_push_count") or 0) + 1
+    frappe.db.set_value(doctype, user_doc.name, "unread_push_count", new_badge)
+    frappe.db.commit()
+
+    # 4. Získame jeho APNs tokeny zo child table 'Zariadenie'
     devices = user_doc.get("zariadenie") or []
     sent_count = 0
 
@@ -63,9 +69,32 @@ def send_notification():
                 custom_data={
                     "email_from": sender_email, # Aby iOS vedel otvoriť chat (používame email)
                     "type": "chat"
-                }
+                },
+                badge=new_badge          # Počet neprečítaných → ikona appky
             )
             if success:
                 sent_count += 1
 
     return {"success": True, "sent_to": sent_count}
+
+
+@frappe.whitelist(methods=["POST"], allow_guest=True)
+def reset_badge():
+    """
+    Appka volá keď ju používateľ otvorí — vynuluje počítadlo neprečítaných pushov,
+    takže badge na ikone zmizne. Autentifikované cez náš JWT (email).
+    """
+    from .utils import verify_bearer_and_get_email
+
+    email, _ = verify_bearer_and_get_email()
+    if not email:
+        frappe.throw("Invalid token", frappe.PermissionError)
+
+    doctype, user_doc = get_actor_by_email(email)
+    if not user_doc:
+        return {"success": False, "error": "User not found"}
+
+    frappe.db.set_value(doctype, user_doc.name, "unread_push_count", 0)
+    frappe.db.commit()
+
+    return {"success": True}

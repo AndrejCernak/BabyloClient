@@ -12,7 +12,8 @@
   "heslo",
   "zariadenie",
   "clerk_id",
-  "poradcovia"
+  "poradcovia",
+  "unread_push_count"
  ],
  "fields": [
   {
@@ -54,6 +55,13 @@
    "fieldtype": "Table",
    "label": "Moji poradcovia ",
    "options": "Poradca Klienta"
+  },
+  {
+   "default": "0",
+   "fieldname": "unread_push_count",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Unread Push Count"
   }
  ],
  "grid_page_length": 50,

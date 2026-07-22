@@ -13,7 +13,8 @@
   "poradcovia",
   "google_calendar_section",
   "google_calendar_id",
-  "google_json_file"
+  "google_json_file",
+  "unread_push_count"
  ],
  "fields": [
   {
@@ -62,6 +63,13 @@
    "fieldname": "google_json_file",
    "fieldtype": "Attach",
    "label": "Google JSON File (Credentials)"
+  },
+  {
+   "default": "0",
+   "fieldname": "unread_push_count",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Unread Push Count"
   }
  ],
  "grid_page_length": 50,
