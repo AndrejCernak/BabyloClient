@@ -115,6 +115,37 @@ def _build_apns_jwt():
     return token
 
 
+def _cleanup_dead_token_if_needed(resp, device_token: str, token_field: str):
+    """
+    Ak APNs vrati 400 BadDeviceToken / 410 Unregistered / DeviceTokenNotForTopic,
+    token uz nikdy nebude fungovat -> vymazeme zariadenie z DB,
+    aby sa nan neskusalo pushovat donekonecna.
+    token_field: 'voip_token' alebo 'apns_token'
+    """
+    if resp.status_code not in (400, 410):
+        return
+
+    try:
+        reason = resp.json().get("reason")
+    except Exception:
+        reason = None
+
+    if reason not in ("BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"):
+        return
+
+    try:
+        frappe.db.sql(
+            f"DELETE FROM `tabZariadenie` WHERE `{token_field}`=%s",
+            (device_token,),
+        )
+        frappe.db.commit()
+        frappe.logger().info(
+            f"🧹 Deleted dead device ({token_field}, reason={reason}): {device_token[:12]}…"
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "APNS Dead Token Cleanup Error")
+
+
 def send_voip_push(device_token: str, payload: dict):
     """Odošle VoIP Push notifikáciu na zadaný Apple device token."""
     settings = get_settings()
@@ -139,6 +170,7 @@ def send_voip_push(device_token: str, payload: dict):
     if resp.status_code != 200:
         # V prípade chyby nevyhadzujeme throw, aby nezlyhal celý proces start_call, len zalogujeme
         frappe.log_error(f"APNs error {resp.status_code}: {resp.text}", "APNS Critical Error")
+        _cleanup_dead_token_if_needed(resp, device_token, "voip_token")
         return None
 
     return {"apns_id": resp.headers.get("apns-id")}
@@ -208,6 +240,7 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
 
         if resp.status_code != 200:
             frappe.log_error(f"APNs Chat Error {resp.status_code}: {resp.text}", "APNS Chat Error")
+            _cleanup_dead_token_if_needed(resp, device_token, "apns_token")
             return False
             
         return True
