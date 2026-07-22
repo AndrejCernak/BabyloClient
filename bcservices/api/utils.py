@@ -190,10 +190,11 @@ def get_actor_by_email(email: str):
     return None, None
 
 
-def send_chat_push(device_token: str, title: str, body: str, custom_data: dict = None):
+def send_chat_push(device_token: str, title: str, body: str, custom_data: dict = None, badge: int = None):
     """
     Odošle štandardnú (Chat) Push notifikáciu.
     Rozdiel oproti VoIP: iný topic, iný push-type, iný payload.
+    badge: ak nie je None, iOS nastaví toto číslo na ikonu appky (počet neprečítaných).
     """
     settings = get_settings()
 
@@ -227,7 +228,11 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
             "content-available": 1 # Umožní zobudiť appku na pozadí
         }
     }
-    
+
+    # Badge = počet neprečítaných (posiela backend, aby ho iOS videl aj pri zavretej appke)
+    if badge is not None:
+        payload["aps"]["badge"] = badge
+
     # Pridáme vlastné dáta (napr. kto poslal správu, aby sa otvoril správny chat)
     if custom_data:
         payload.update(custom_data)
