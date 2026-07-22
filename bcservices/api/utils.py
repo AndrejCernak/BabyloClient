@@ -217,15 +217,17 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
         "content-type": "application/json",
     }
 
-    # Štandardný Apple payload pre správy
+    # Štandardný Apple payload pre správy.
+    # POZOR: zámerne BEZ "content-available" — to by z pushu spravilo "background"
+    # push, ktoré Apple throttluje a zahadzuje (appka ho aj tak nepoužíva).
+    # Čistý alert push s priority 10 sa doručuje spoľahlivo.
     payload = {
         "aps": {
             "alert": {
                 "title": title,
                 "body": body
             },
-            "sound": "default",
-            "content-available": 1 # Umožní zobudiť appku na pozadí
+            "sound": "default"
         }
     }
 
