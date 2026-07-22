@@ -1,5 +1,29 @@
+import json
 import frappe
 from .utils import get_actor_by_email, send_chat_push
+
+
+def _load_unread_map(user_doc) -> dict:
+    """Neprečítané správy rozpísané per odosielateľ (email -> počet). Uložené ako JSON."""
+    raw = user_doc.get("unread_by_sender")
+    if not raw:
+        return {}
+    try:
+        val = json.loads(raw)
+        return val if isinstance(val, dict) else {}
+    except Exception:
+        return {}
+
+
+def _store_unread_map(doctype, name, unread_map: dict) -> int:
+    """Uloží mapu + zosynchronizuje celkový počet (badge). Vráti celkový počet."""
+    total = sum(int(v) for v in unread_map.values())
+    frappe.db.set_value(doctype, name, {
+        "unread_by_sender": json.dumps(unread_map),
+        "unread_push_count": total,
+    })
+    frappe.db.commit()
+    return total
 
 @frappe.whitelist(methods=["POST"], allow_guest=True)
 def send_notification():
@@ -49,11 +73,13 @@ def send_notification():
     if not user_doc:
         return {"success": False, "error": "User not found"}
 
-    # 3. Zvýšime počítadlo neprečítaných pushov pre príjemcu (badge na ikone).
-    #    Appka ho vynuluje cez reset_badge keď ju používateľ otvorí.
-    new_badge = (user_doc.get("unread_push_count") or 0) + 1
-    frappe.db.set_value(doctype, user_doc.name, "unread_push_count", new_badge)
-    frappe.db.commit()
+    # 3. Zvýšime počítadlo neprečítaných PER ODOSIELATEĽ. Badge = súčet všetkých.
+    #    Appka pri otvorení konkrétneho chatu zavolá mark_chat_read(from_user),
+    #    čím sa odpočíta len tá jedna konverzácia (badge klesne presne o toľko).
+    unread_map = _load_unread_map(user_doc)
+    key = sender_email or "unknown"
+    unread_map[key] = int(unread_map.get(key, 0)) + 1
+    new_badge = _store_unread_map(doctype, user_doc.name, unread_map)
 
     # 4. Získame jeho APNs tokeny zo child table 'Zariadenie'
     devices = user_doc.get("zariadenie") or []
@@ -79,10 +105,37 @@ def send_notification():
 
 
 @frappe.whitelist(methods=["POST"], allow_guest=True)
+def mark_chat_read():
+    """
+    Appka volá keď používateľ OTVORÍ konkrétny chat — vynuluje neprečítané len
+    pre daného odosielateľa (from_user). Vráti nový celkový badge, ktorý si appka
+    nastaví na ikonu. Autentifikované cez náš JWT (email).
+    """
+    from .utils import verify_bearer_and_get_email
+
+    email, _ = verify_bearer_and_get_email()
+    if not email:
+        frappe.throw("Invalid token", frappe.PermissionError)
+
+    from_user = frappe.local.form_dict.get("from_user")
+    if not from_user:
+        return {"success": False, "error": "Missing from_user"}
+
+    doctype, user_doc = get_actor_by_email(email)
+    if not user_doc:
+        return {"success": False, "error": "User not found"}
+
+    unread_map = _load_unread_map(user_doc)
+    unread_map.pop(from_user, None)
+    total = _store_unread_map(doctype, user_doc.name, unread_map)
+
+    return {"success": True, "badge": total}
+
+
+@frappe.whitelist(methods=["POST"], allow_guest=True)
 def reset_badge():
     """
-    Appka volá keď ju používateľ otvorí — vynuluje počítadlo neprečítaných pushov,
-    takže badge na ikone zmizne. Autentifikované cez náš JWT (email).
+    Vynuluje VŠETKY neprečítané (fallback / úplný reset). Autentifikované cez JWT.
     """
     from .utils import verify_bearer_and_get_email
 
@@ -94,7 +147,6 @@ def reset_badge():
     if not user_doc:
         return {"success": False, "error": "User not found"}
 
-    frappe.db.set_value(doctype, user_doc.name, "unread_push_count", 0)
-    frappe.db.commit()
+    _store_unread_map(doctype, user_doc.name, {})
 
     return {"success": True}

@@ -13,7 +13,8 @@
   "zariadenie",
   "clerk_id",
   "poradcovia",
-  "unread_push_count"
+  "unread_push_count",
+  "unread_by_sender"
  ],
  "fields": [
   {
@@ -62,6 +63,12 @@
    "fieldtype": "Int",
    "hidden": 1,
    "label": "Unread Push Count"
+  },
+  {
+   "fieldname": "unread_by_sender",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Unread By Sender (JSON)"
   }
  ],
  "grid_page_length": 50,
