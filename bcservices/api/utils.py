@@ -224,7 +224,6 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
                 "body": body
             },
             "sound": "default",
-            "badge": 1,
             "content-available": 1 # Umožní zobudiť appku na pozadí
         }
     }
