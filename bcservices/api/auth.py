@@ -87,6 +87,60 @@ def on_update_bc_poradca(doc, method=None):
 
 
 # -----------------------------------------------------------------------------
+# Kaskádové mazanie používateľa (Klient / Poradca)
+# -----------------------------------------------------------------------------
+
+def on_trash_bc_user(doc, method=None):
+    """
+    Pred zmazaním Klienta/Poradcu zmaže VŠETKY doctypy, ktoré naň odkazujú
+    (hovory, tokeny, transakcie, inzeráty, správy chatu) a zrkadlené
+    prepojenia (Poradca Klienta) u druhej strany.
+
+    on_trash beží PRED Frappe kontrolou linkov, takže po vyčistení už
+    mazanie samotného používateľa neprejde cez LinkExistsError.
+
+    Riešenie je generické: nájde všetky Link polia (aj Custom Field), ktoré
+    ukazujú na tento doctype, takže funguje aj keď v budúcnosti pribudne
+    nový doctype s väzbou na Klienta/Poradcu.
+    """
+    doctype = doc.doctype
+    name = doc.name
+
+    # 1. Nájdi všetky Link polia mieriace na tento doctype (štandardné + custom).
+    targets = []
+    for r in frappe.get_all(
+        "DocField",
+        filters={"fieldtype": "Link", "options": doctype},
+        fields=["parent", "fieldname"],
+    ):
+        targets.append((r.parent, r.fieldname))
+    for r in frappe.get_all(
+        "Custom Field",
+        filters={"fieldtype": "Link", "options": doctype},
+        fields=["dt", "fieldname"],
+    ):
+        targets.append((r.dt, r.fieldname))
+
+    # 2. Zmaž nalinkované záznamy. force=True obíde poradie závislostí medzi nimi.
+    for linked_dt, fieldname in targets:
+        if not linked_dt or linked_dt == doctype:
+            continue
+        # child (istable) doctypy sa mažú spolu s rodičom, nemažeme ich samostatne
+        if frappe.get_meta(linked_dt).istable:
+            continue
+        for rec in frappe.get_all(linked_dt, filters={fieldname: name}, pluck="name"):
+            frappe.delete_doc(
+                linked_dt, rec,
+                force=True, ignore_permissions=True, delete_permanently=True,
+            )
+
+    # 3. Zrkadlené prepojenia: Poradca Klienta je Dynamic Link child table
+    #    aj u druhej strany (napr. riadok u poradcu ukazujúci na tohto klienta).
+    #    Vlastné child riadky používateľa sa zmažú s ním; tieto sú u iných rodičov.
+    frappe.db.delete("Poradca Klienta", {"typ_uzivatela": doctype, "uzivatel_link": name})
+
+
+# -----------------------------------------------------------------------------
 # Zoznamy prepojených používateľov
 # -----------------------------------------------------------------------------
 
