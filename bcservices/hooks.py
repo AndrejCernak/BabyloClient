@@ -15,9 +15,11 @@ app_license = "unlicense"
 doc_events = {
     "Klient": {
         "on_update": "bcservices.api.auth.on_update_bc_pouzivatel",
+        "on_trash": "bcservices.api.auth.on_trash_bc_user",
     },
     "Poradca": {
         "on_update": "bcservices.api.auth.on_update_bc_poradca",
+        "on_trash": "bcservices.api.auth.on_trash_bc_user",
     }
 }
 
