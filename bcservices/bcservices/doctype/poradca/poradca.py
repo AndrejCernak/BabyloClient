@@ -33,7 +33,7 @@ class Poradca(Document):
         boli vám vytvorené prihlasovacie údaje do systému.<br><br>
         📧 <b>Email:</b> {self.email}<br>
         🔐 <b>Heslo:</b> <code>{password_safe}</code><br><br>
-        Prosím, <a href="{login_url}">prihláste sa do systému</a> a heslo si v prípade potreby zmeňte.<br><br>
+        Prosím, <a href="{login_url}">prihláste sa do aplikácie</a><br><br>
         S pozdravom,<br>
         Váš tím
         """
