@@ -26,7 +26,7 @@ class Poradca(Document):
         # Ošetrenie špeciálnych znakov v hesle pre HTML formát
         password_safe = html.escape(str(self.heslo) or "")
 
-        login_url = frappe.utils.get_url("/login")
+        login_url = "https://apps.apple.com/sk/app/bfg-client/id6782660797?l=sk"
         # HTML správa - opravená na self.meno a self.email
         message = f"""
         Dobrý deň {self.meno or 'používateľ'},<br><br>

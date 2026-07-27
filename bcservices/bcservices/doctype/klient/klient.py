@@ -15,14 +15,14 @@ class Klient(Document):
         password_safe = html.escape(self.heslo or "")
         subject = "[BFG] Vaše prihlasovacie údaje"
 
-        login_url = frappe.utils.get_url("/login")
+        login_url = "https://apps.apple.com/sk/app/bfg-client/id6782660797?l=sk"
 
         message = f"""
         Dobrý deň {self.username or 'používateľ'},<br><br>
-        boli vám vytvorené prihlasovacie údaje do systému.<br><br>
+        boli vám vytvorené prihlasovacie údaje do aplikácie BFG Client Services.<br><br>
         📧 <b>Email:</b> {email}<br>
         🔐 <b>Heslo:</b> {password_safe}<br><br>
-        Prosím, <a href="{login_url}">prihláste sa do systému</a> a heslo si v prípade potreby zmeňte.<br><br>
+        Prosím, <a href="{login_url}">prihláste sa do aplikácie</a><br><br>
         S pozdravom,<br>
         Váš tím
         """
