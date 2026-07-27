@@ -26,13 +26,14 @@ class Poradca(Document):
         # Ošetrenie špeciálnych znakov v hesle pre HTML formát
         password_safe = html.escape(str(self.heslo) or "")
 
+        login_url = frappe.utils.get_url("/login")
         # HTML správa - opravená na self.meno a self.email
         message = f"""
         Dobrý deň {self.meno or 'používateľ'},<br><br>
         boli vám vytvorené prihlasovacie údaje do systému.<br><br>
         📧 <b>Email:</b> {self.email}<br>
         🔐 <b>Heslo:</b> <code>{password_safe}</code><br><br>
-        Prosím, prihláste sa do systému a heslo si v prípade potreby zmeňte.<br><br>
+        Prosím, <a href="{login_url}">prihláste sa do systému</a> a heslo si v prípade potreby zmeňte.<br><br>
         S pozdravom,<br>
         Váš tím
         """

@@ -13,13 +13,16 @@ class Klient(Document):
             frappe.msgprint("Klient nemá vyplnený email alebo heslo.")
             return
         password_safe = html.escape(self.heslo or "")
-        subject = "Vaše prihlasovacie údaje"
+        subject = "[BFG] Vaše prihlasovacie údaje"
+
+        login_url = frappe.utils.get_url("/login")
+
         message = f"""
         Dobrý deň {self.username or 'používateľ'},<br><br>
         boli vám vytvorené prihlasovacie údaje do systému.<br><br>
         📧 <b>Email:</b> {email}<br>
         🔐 <b>Heslo:</b> {password_safe}<br><br>
-        Prosím, prihláste sa do systému a heslo si v prípade potreby zmeňte.<br><br>
+        Prosím, <a href="{login_url}">prihláste sa do systému</a> a heslo si v prípade potreby zmeňte.<br><br>
         S pozdravom,<br>
         Váš tím
         """
