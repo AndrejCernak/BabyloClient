@@ -114,8 +114,9 @@ def get_klienti(q: str | None = None, vsetky: int | str | None = None):
 	"""
 	Vráti skratky klientov ako [{"kod": ..., "meno": ...}], zoradené podľa skratky.
 
-	q       – voliteľný filter; hľadá v skratke aj názve, bez ohľadu na veľkosť
-	          písmen a diakritiku. Prázdne q vráti všetkých.
+	q       – voliteľný filter; vracia záznamy, ktorých skratka alebo názov
+	          ZAČÍNA zadaným textom, bez ohľadu na veľkosť písmen a diakritiku.
+	          Prázdne q vráti všetkých.
 	vsetky  – 1 = vrátiť aj neaktívnych. Predvolene sa vracajú len aktívni.
 
 	Volanie: GET /api/method/bcservices.api.skratka.get_klienti?q=agro
@@ -144,7 +145,12 @@ def get_klienti(q: str | None = None, vsetky: int | str | None = None):
 
 		meno = (z.get("nazov") or "").strip() or kod
 
-		if hladanie and hladanie not in _bez_diakritiky(kod) and hladanie not in _bez_diakritiky(meno):
+		# hľadá sa od začiatku – „t“ nájde „tatra“, nie „bestall“
+		if (
+			hladanie
+			and not _bez_diakritiky(kod).startswith(hladanie)
+			and not _bez_diakritiky(meno).startswith(hladanie)
+		):
 			continue
 
 		klienti.append({"kod": kod, "meno": meno})
