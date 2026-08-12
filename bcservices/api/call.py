@@ -151,11 +151,17 @@ def start():
         if auth_email == c1_id:
             target_doctype = "Poradca" if p2_poradca else "Klient"
             target_id = p2_poradca or p2_klient
-            display_name = p1_poradca or p1_klient
+            caller_poradca, caller_klient = p1_poradca, p1_klient
         else:
             target_doctype = "Poradca" if p1_poradca else "Klient"
             target_id = p1_poradca or p1_klient
-            display_name = p2_poradca or p2_klient
+            caller_poradca, caller_klient = p2_poradca, p2_klient
+
+        # Skutočné meno volajúceho (nie docname, ktorý môže byť hash)
+        if caller_poradca:
+            display_name = frappe.db.get_value("Poradca", caller_poradca, "meno") or caller_poradca
+        else:
+            display_name = frappe.db.get_value("Klient", caller_klient, "username") or caller_klient
 
         now = now_datetime()
 
