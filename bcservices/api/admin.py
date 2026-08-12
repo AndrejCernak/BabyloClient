@@ -37,7 +37,7 @@ def list_clients():
     # Nájdi klientov kde je tento poradca priradený
     linked = frappe.get_all(
         "Poradca Klienta",
-        filters={"poradca_link": poradca_name, "parenttype": "Klient"},
+        filters={"uzivatel_link": poradca_name, "typ_uzivatela": "Poradca", "parenttype": "Klient"},
         fields=["parent"]
     )
     
