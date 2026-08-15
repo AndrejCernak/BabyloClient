@@ -146,31 +146,77 @@ def _cleanup_dead_token_if_needed(resp, device_token: str, token_field: str):
         frappe.log_error(frappe.get_traceback(), "APNS Dead Token Cleanup Error")
 
 
+APNS_HOST_PROD = "https://api.push.apple.com"
+APNS_HOST_SANDBOX = "https://api.sandbox.push.apple.com"
+
+
+def _apns_hosts():
+    """
+    Poradie APNs prostredi podla nastavenia. Vracia OBE — appka moze byt sucasne
+    nasadena z Xcode (sandbox token) aj z TestFlight/App Store (production token)
+    a jeden backend musi obsluzit oboje. Preferovane prostredie ide prve.
+    """
+    prod_first = cint(get_settings().apn_production) == 1
+    return [APNS_HOST_PROD, APNS_HOST_SANDBOX] if prod_first else [APNS_HOST_SANDBOX, APNS_HOST_PROD]
+
+
+def _apns_reason(resp):
+    try:
+        return resp.json().get("reason")
+    except Exception:
+        return None
+
+
+def _apns_send(device_token: str, headers: dict, payload: dict, token_field: str, log_tag: str):
+    """
+    Posle push; pri BadDeviceToken skusi druhe APNs prostredie (sandbox <-> production).
+    Token maze az ked ho odmietnu OBE prostredia — inak by sme mazali platne tokeny.
+    """
+    last_resp = None
+    for host in _apns_hosts():
+        url = f"{host}/3/device/{device_token}"
+        try:
+            with httpx.Client(http2=True, timeout=10) as client:
+                resp = client.post(url, headers=headers, json=payload)
+        except Exception as e:
+            frappe.log_error(f"APNs Connection Error ({host}): {e}", "APNS Exception")
+            return None
+
+        if resp.status_code == 200:
+            return resp
+
+        last_resp = resp
+        # Nespravne prostredie pre tento token -> skus druhe
+        if resp.status_code == 400 and _apns_reason(resp) == "BadDeviceToken":
+            continue
+
+        frappe.log_error(f"APNs error {resp.status_code} ({host}): {resp.text}", log_tag)
+        _cleanup_dead_token_if_needed(resp, device_token, token_field)
+        return None
+
+    # Odmietli obe prostredia -> token je naozaj mrtvy
+    if last_resp is not None:
+        frappe.log_error(
+            f"APNs error {last_resp.status_code} (obe prostredia): {last_resp.text}", log_tag
+        )
+        _cleanup_dead_token_if_needed(last_resp, device_token, token_field)
+    return None
+
+
 def send_voip_push(device_token: str, payload: dict):
-    """Odošle VoIP Push notifikáciu na zadaný Apple device token."""
+    """Odosle VoIP Push notifikaciu na zadany Apple device token."""
     settings = get_settings()
-
     bundle_id = settings.apn_bundle_id
-    prod = cint(settings.apn_production) == 1
-    host = "https://api.push.apple.com" if prod else "https://api.sandbox.push.apple.com"
-    url = f"{host}/3/device/{device_token}"
-
-    jwt_token = _build_apns_jwt()
 
     headers = {
-        "authorization": f"bearer {jwt_token}",
+        "authorization": f"bearer {_build_apns_jwt()}",
         "apns-topic": f"{bundle_id}.voip",
         "apns-push-type": "voip",
         "content-type": "application/json",
     }
 
-    with httpx.Client(http2=True, timeout=10) as client:
-        resp = client.post(url, headers=headers, json=payload)
-
-    if resp.status_code != 200:
-        # V prípade chyby nevyhadzujeme throw, aby nezlyhal celý proces start_call, len zalogujeme
-        frappe.log_error(f"APNs error {resp.status_code}: {resp.text}", "APNS Critical Error")
-        _cleanup_dead_token_if_needed(resp, device_token, "voip_token")
+    resp = _apns_send(device_token, headers, payload, "voip_token", "APNS Critical Error")
+    if resp is None:
         return None
 
     return {"apns_id": resp.headers.get("apns-id")}
@@ -203,11 +249,7 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
     # Topic musí byť presne tvoje Bundle ID (napr. com.firma.app)
     topic = bundle_id 
     
-    prod = cint(settings.apn_production) == 1
-    host = "https://api.push.apple.com" if prod else "https://api.sandbox.push.apple.com"
-    url = f"{host}/3/device/{device_token}"
-
-    jwt_token = _build_apns_jwt() # Použijeme tú istú funkciu na JWT ako pri VoIP
+    jwt_token = _build_apns_jwt()
 
     headers = {
         "authorization": f"bearer {jwt_token}",
@@ -240,19 +282,9 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
         payload.update(custom_data)
 
     # Odoslanie requestu (rovnako ako pri VoIP)
-    try:
-        with httpx.Client(http2=True, timeout=10) as client:
-            resp = client.post(url, headers=headers, json=payload)
+    return _apns_send(device_token, headers, payload, "apns_token", "APNS Chat Error") is not None
 
-        if resp.status_code != 200:
-            frappe.log_error(f"APNs Chat Error {resp.status_code}: {resp.text}", "APNS Chat Error")
-            _cleanup_dead_token_if_needed(resp, device_token, "apns_token")
-            return False
-            
-        return True
-    except Exception as e:
-        frappe.log_error(f"APNs Connection Error: {str(e)}", "APNS Exception")
-        return False
+
 # ---------------------------------------------------
 # Device helper
 # ---------------------------------------------------
