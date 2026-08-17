@@ -1,3 +1,4 @@
+import json
 import math
 import traceback
 import frappe
@@ -9,6 +10,7 @@ from frappe import _
 from .utils import (
     verify_bearer_and_get_email,
     send_voip_push,
+    get_actor_by_email,
 )
 
 # Importujeme Google Calendar logiku (z nového súboru google_calendar.py)
@@ -109,6 +111,57 @@ def consume_tokens_after_call(klient_name, seconds_used, call_doc):
 # ----------------------------------------------------------------------
 # START CALL (Obojstranný) - ✅ S KONTROLOU TOKENOV
 # ----------------------------------------------------------------------
+
+def _resolve_user(email):
+    """Vrati (docname, meno, 'Klient'|'Poradca') alebo (None, None, None)."""
+    name = frappe.db.get_value("Poradca", {"email": email}, "name")
+    if name:
+        return name, (frappe.db.get_value("Poradca", name, "meno") or name), "Poradca"
+    name = frappe.db.get_value("Klient", {"email": email}, "name")
+    if name:
+        return name, (frappe.db.get_value("Klient", name, "username") or name), "Klient"
+    return None, None, None
+
+
+def _add_participant(call_doc, email, meno):
+    """Prida ucastnika do dennika (ak tam este nie je)."""
+    for row in (call_doc.get("ucastnici") or []):
+        if row.email == email:
+            return
+    call_doc.append("ucastnici", {
+        "email": email,
+        "meno": meno,
+        "pridany": now_datetime(),
+    })
+
+
+def _send_voip_to_user(docname, doctype, payload):
+    """Posle VoIP push na vsetky zariadenia usera. Vrati pocet uspesnych."""
+    target_doc = frappe.get_doc(doctype, docname)
+    sent = 0
+    for d in (target_doc.get("zariadenie") or []):
+        token = getattr(d, "voip_token", None)
+        if token and send_voip_push(token, payload):
+            sent += 1
+    return sent
+
+
+def _is_call_participant(doc, email):
+    """Je dany email ucastnikom hovoru? (zakladne polia aj child tabulka)"""
+    for row in (doc.get("ucastnici") or []):
+        if row.email == email:
+            return True
+    klient_name = frappe.db.get_value("Klient", {"email": email}, "name")
+    advisor_name = frappe.db.get_value("Poradca", {"email": email}, "name")
+    if klient_name and doc.klient == klient_name:
+        return True
+    if advisor_name and doc.poradca == advisor_name:
+        return True
+    if advisor_name and doc.get("poradca2") == advisor_name:
+        return True
+    return False
+
+
 @frappe.whitelist(methods=["POST"], allow_guest=True)
 def start():
     debug_id = frappe.generate_hash(length=4)
@@ -117,6 +170,18 @@ def start():
 
     c1_id = data.get("callerId")
     c2_id = data.get("advisorId")
+
+    # Konferencia: zoznam vsetkych volanych. Stare appky posielaju len advisorId.
+    callee_ids = data.get("calleeIds")
+    if isinstance(callee_ids, str):
+        try:
+            callee_ids = json.loads(callee_ids)
+        except Exception:
+            callee_ids = None
+    if not isinstance(callee_ids, list) or not callee_ids:
+        callee_ids = [c2_id]
+    callee_ids = [c for c in callee_ids if c][:4]
+    is_conference = len(callee_ids) > 1
 
     try:
         auth_email, _ = verify_bearer_and_get_email()
@@ -135,8 +200,9 @@ def start():
         if not is_poradca_to_poradca and (not real_klient or not real_poradca):
             return {"success": False, "error": "Participants not found"}
 
-        # Piatok token check — len pre hovory kde je klient
-        if real_klient:
+        # Piatok token check — len pre 1:1 hovory kde je klient.
+        # Konferencie tokeny neriesia (rozhodnutie zadavatela).
+        if real_klient and not is_conference:
             can_call, error_msg = check_friday_tokens(real_klient)
             if not can_call:
                 return {
@@ -178,6 +244,14 @@ def start():
                 "zaciatok_cas": now.strftime("%H:%M:%S"),
             })
 
+        caller_name_disp = display_name
+        _add_participant(call_doc, c1_id, caller_name_disp)
+        _, first_callee_name, _ = _resolve_user(c2_id)
+        if first_callee_name:
+            _add_participant(call_doc, c2_id, first_callee_name)
+        if is_conference:
+            call_doc.je_konferencia = 1
+
         call_doc.insert(ignore_permissions=True)
         frappe.db.commit()
 
@@ -190,20 +264,24 @@ def start():
             except Exception as e:
                 frappe.log_error(f"Failed to create Google Event: {e}", log_tag)
 
-        target_doc = frappe.get_doc(target_doctype, target_id)
-        devices = target_doc.get("zariadenie") or []
+        payload = {
+            "callId": call_doc.name,
+            "callerId": auth_email,
+            "callerName": display_name,
+            "title": "Prichádzajúci hovor"
+        }
         sent_count = 0
-        for d in devices:
-            token = getattr(d, "voip_token", None) or getattr(d, "voipToken", None)
-            if token:
-                payload = {
-                    "callId": call_doc.name,
-                    "callerId": auth_email,
-                    "callerName": display_name,
-                    "title": "Prichádzajúci hovor"
-                }
-                if send_voip_push(token, payload):
-                    sent_count += 1
+        callees_to_ring = [c for c in callee_ids if c != auth_email]
+        for callee_email in callees_to_ring:
+            cal_docname, cal_meno, cal_type = _resolve_user(callee_email)
+            if not cal_docname:
+                continue
+            # Dalsi volani (okrem prveho, ten uz je) do zoznamu ucastnikov
+            _add_participant(call_doc, callee_email, cal_meno)
+            sent_count += _send_voip_to_user(cal_docname, cal_type, payload)
+
+        call_doc.save(ignore_permissions=True)
+        frappe.db.commit()
 
         frappe.logger().info(f"✅ Call started: {call_doc.name}, sent_to: {sent_count}")
         return {"success": True, "callId": call_doc.name, "sent_to": sent_count}
@@ -227,15 +305,8 @@ def accept():
         doc = frappe.get_doc("Dennik hovorov", call_id)
 
         # OVERENIE: Je ten, kto klikol "Prijať", jeden z účastníkov hovoru?
-        is_valid = False
-        klient_name = frappe.db.get_value("Klient", {"email": email}, "name")
-        advisor_name = frappe.db.get_value("Poradca", {"email": email}, "name")
-
-        # Oprava: Kontrolujeme polia 'klient' a 'poradca', nie 'volajuci'
-        if (klient_name and doc.klient == klient_name) or (advisor_name and doc.poradca == advisor_name):
-            is_valid = True
-
-        if not is_valid:
+        # (základné polia aj konferenčná tabuľka účastníkov)
+        if not _is_call_participant(doc, email):
             frappe.throw(_("Unauthorized to accept this call"), frappe.PermissionError)
 
         doc.prijaty = 1
@@ -284,7 +355,7 @@ def end():
 
         # 🔥 Čerpanie tokenov ak bol piatok (podľa zaciatok_datum)
         try:
-            if doc.klient and duration > 0:
+            if doc.klient and duration > 0 and not doc.get("je_konferencia"):
                 start_dt = datetime.combine(getdate(doc.zaciatok_datum), get_time(doc.zaciatok_cas))
                 was_friday = start_dt.weekday() == 4
                 if was_friday:
@@ -305,3 +376,67 @@ def end():
     except Exception as e:
         frappe.log_error(traceback.format_exc(), "BC End Error")
         return {"success": False}
+
+
+# ----------------------------------------------------------------------
+# INVITE — prizvanie dalsieho ucastnika do prebiehajuceho hovoru
+# ----------------------------------------------------------------------
+@frappe.whitelist(methods=["POST"], allow_guest=True)
+def invite():
+    try:
+        email, _ = verify_bearer_and_get_email()
+        data = frappe.local.form_dict or {}
+        call_id = data.get("callId")
+        invitee_email = data.get("inviteeId")
+
+        if not call_id or not invitee_email:
+            return {"success": False, "error": "Missing callId or inviteeId"}
+
+        doc = frappe.get_doc("Dennik hovorov", call_id)
+
+        # Prizvat moze len ucastnik hovoru
+        if not _is_call_participant(doc, email):
+            return {"success": False, "error": "Unauthorized"}
+
+        # Strop 5 ucastnikov
+        if len(doc.get("ucastnici") or []) >= 5:
+            return {"success": False, "error": "Hovor je plný (max 5 účastníkov)"}
+
+        invitee_docname, invitee_meno, invitee_type = _resolve_user(invitee_email)
+        if not invitee_docname:
+            return {"success": False, "error": "Používateľ neexistuje"}
+
+        # Prizvat sa da len clovek, ktoreho ma prizyvajuci priradeneho
+        inviter_doctype, inviter_doc = get_actor_by_email(email)
+        if not inviter_doc:
+            return {"success": False, "error": "Unauthorized"}
+        linked = any(
+            row.uzivatel_link == invitee_docname
+            for row in (inviter_doc.get("poradcovia") or [])
+        )
+        if not linked:
+            return {"success": False, "error": "Tohto používateľa nemáte priradeného"}
+
+        _, inviter_meno, _ = _resolve_user(email)
+
+        payload = {
+            "callId": doc.name,
+            "callerId": email,
+            "callerName": inviter_meno or email,
+            "title": "Prichádzajúci hovor"
+        }
+        sent = _send_voip_to_user(invitee_docname, invitee_type, payload)
+
+        _add_participant(doc, invitee_email, invitee_meno)
+        doc.je_konferencia = 1
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        if sent == 0:
+            return {"success": False, "error": "Používateľ nemá zaregistrované zariadenie"}
+
+        return {"success": True, "sent_to": sent}
+
+    except Exception:
+        frappe.log_error(traceback.format_exc(), "BC Invite Error")
+        return {"success": False, "error": "Internal server error"}

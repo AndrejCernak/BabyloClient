@@ -15,7 +15,9 @@
   "koniec_datum",
   "koniec_cas",
   "trvanie_s",
-  "pouzity_token"
+  "pouzity_token",
+  "je_konferencia",
+  "ucastnici"
  ],
  "fields": [
   {
@@ -76,6 +78,18 @@
    "fieldname": "koniec_cas",
    "fieldtype": "Time",
    "label": "Koniec čaš"
+  },
+  {
+   "fieldname": "je_konferencia",
+   "fieldtype": "Check",
+   "label": "Je konferencia",
+   "default": "0"
+  },
+  {
+   "fieldname": "ucastnici",
+   "fieldtype": "Table",
+   "label": "Účastníci",
+   "options": "Ucastnik hovoru"
   }
  ],
  "grid_page_length": 50,
