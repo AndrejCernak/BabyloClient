@@ -136,12 +136,18 @@ def _add_participant(call_doc, email, meno):
 
 
 def _send_voip_to_user(docname, doctype, payload):
-    """Posle VoIP push na vsetky zariadenia usera. Vrati pocet uspesnych."""
+    """Posle VoIP push na vsetky zariadenia usera. Vrati pocet uspesnych.
+    Duplicitne tokeny (stare registracie) posiela len raz - inak by ten isty
+    telefon zvonil viackrat naraz a rozbil CallKit stav v appke."""
     target_doc = frappe.get_doc(doctype, docname)
     sent = 0
+    seen = set()
     for d in (target_doc.get("zariadenie") or []):
         token = getattr(d, "voip_token", None)
-        if token and send_voip_push(token, payload):
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        if send_voip_push(token, payload):
             sent += 1
     return sent
 
