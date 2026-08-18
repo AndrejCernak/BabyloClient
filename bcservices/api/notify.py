@@ -51,16 +51,16 @@ def send_notification():
     if sender_email:
         try:
             # Použijeme tú istú funkciu na hľadanie odosielateľa v DB
-            _, sender_doc = get_actor_by_email(sender_email)
+            sender_doctype, sender_doc = get_actor_by_email(sender_email)
 
             if sender_doc:
-                # Skúsime nájsť najlepšie dostupné meno v poradí: username -> full_name -> name
-                real_sender_name = (
-                    sender_doc.get("username") or
-                    sender_doc.get("full_name") or
-                    sender_doc.get("name") or
-                    raw_sender_name
-                )
+                # POZOR: Poradca ma meno v poli "meno", Klient v "username".
+                # Bez tohto rozlisenia padal fallback az na docname (napr. "s1r5svmgbk")
+                # a to sa zobrazovalo ako nadpis push notifikacie.
+                if sender_doctype == "Poradca":
+                    real_sender_name = sender_doc.get("meno") or raw_sender_name
+                else:
+                    real_sender_name = sender_doc.get("username") or raw_sender_name
         except Exception:
             # Ak nastane chyba pri hľadaní, nevadí, použijeme pôvodné raw meno
             pass
