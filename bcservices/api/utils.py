@@ -290,6 +290,23 @@ def send_chat_push(device_token: str, title: str, body: str, custom_data: dict =
 # ---------------------------------------------------
 
 def upsert_child_device_for_user(user_doc, voip_token=None, apns_token=None):
+    """Registracia zariadenia. Appka ju posiela pri kazdom starte, takze pri viacerych
+    zariadeniach naraz sa requesty bili o zamok nad tabZariadenie (QueryDeadlockError).
+    Pri deadlocku transakciu vratime a skusime znova."""
+    last_error = None
+    for attempt in range(3):
+        try:
+            return _upsert_child_device_for_user(user_doc, voip_token, apns_token)
+        except frappe.QueryDeadlockError as e:
+            last_error = e
+            frappe.db.rollback()
+            user_doc.reload()
+            time.sleep(0.2 * (attempt + 1))
+    frappe.log_error(f"Device upsert failed after retries: {last_error}", "BC Device Upsert")
+    return False
+
+
+def _upsert_child_device_for_user(user_doc, voip_token=None, apns_token=None):
     # odstráň rovnaký token inde (OK, to máš správne)
     if voip_token:
         frappe.db.sql("""

@@ -344,51 +344,79 @@ def end():
         if not call_id or call_id == "PENDING":
             return {"success": True}
 
-        # Načítame dokument
-        doc = frappe.get_doc("Dennik hovorov", call_id)
         now = now_datetime()
 
-        # Nastavíme koniec
-        doc.koniec_datum = now.date()
-        doc.koniec_cas = now.strftime("%H:%M:%S")
+        # Koniec hovoru hlasi KAZDY ucastnik (v konferencii aj 5 naraz).
+        # FOR UPDATE zamkne riadok, takze zvysne requesty pockaju a potom uvidia,
+        # ze hovor uz je ukonceny. Bez toho sa suboezne doc.save() bili o zamok
+        # (QueryDeadlockError) a tokeny sa odpocitali viackrat.
+        row = frappe.db.get_value(
+            "Dennik hovorov",
+            call_id,
+            ["koniec_datum", "zaciatok_datum", "zaciatok_cas", "klient", "je_konferencia"],
+            as_dict=True,
+            for_update=True,
+        )
+        if not row:
+            frappe.db.commit()
+            return {"success": True, "note": "Call not in DB"}
+        if row.get("koniec_datum"):
+            frappe.db.commit()
+            return {"success": True, "note": "already ended"}
 
-        # Vypočítame trvanie
-        duration = 0
-        try:
-            start_dt = datetime.combine(getdate(doc.zaciatok_datum), get_time(doc.zaciatok_cas))
-            duration = max(0, int((now - start_dt).total_seconds()))
-            doc.trvanie_s = duration
-        except:
-            doc.trvanie_s = 0
+        # Trvanie: appka posiela realny cas SPOJENIA (duration_s). Ked hovor nikto
+        # nezdvihol, je 0 -> nic sa nefakturuje. Starsie verzie appky ho neposielaju,
+        # vtedy sa pouzije vypocet od zaciatku (vratane zvonenia) ako doteraz.
+        duration = None
+        raw_duration = data.get("duration_s")
+        if raw_duration is not None:
+            try:
+                duration = max(0, int(float(raw_duration)))
+            except (TypeError, ValueError):
+                duration = None
+        if duration is None:
+            try:
+                start_dt = datetime.combine(getdate(row.get("zaciatok_datum")), get_time(row.get("zaciatok_cas")))
+                duration = max(0, int((now - start_dt).total_seconds()))
+            except Exception:
+                duration = 0
 
-        # Uložíme do DB
-        doc.save(ignore_permissions=True)
+        frappe.db.set_value(
+            "Dennik hovorov",
+            call_id,
+            {
+                "koniec_datum": now.date(),
+                "koniec_cas": now.strftime("%H:%M:%S"),
+                "trvanie_s": duration,
+            },
+            update_modified=True,
+        )
         frappe.db.commit()
 
-        # 🔥 Čerpanie tokenov ak bol piatok (podľa zaciatok_datum)
+        # Cerpanie tokenov: len 1:1 hovory, len v piatok a len ked sa naozaj hovorilo.
         try:
-            if doc.klient and duration > 0 and not doc.get("je_konferencia"):
-                start_dt = datetime.combine(getdate(doc.zaciatok_datum), get_time(doc.zaciatok_cas))
-                was_friday = start_dt.weekday() == 4
-                if was_friday:
-                    consume_tokens_after_call(doc.klient, duration, doc)
+            if row.get("klient") and duration > 0 and not row.get("je_konferencia"):
+                start_dt = datetime.combine(getdate(row.get("zaciatok_datum")), get_time(row.get("zaciatok_cas")))
+                if start_dt.weekday() == 4:
+                    call_doc = frappe.get_doc("Dennik hovorov", call_id)
+                    consume_tokens_after_call(row.get("klient"), duration, call_doc)
         except Exception:
             frappe.log_error(traceback.format_exc(), "BC Token Consume Error")
 
         # --- GOOGLE CALENDAR UPDATE ---
         if update_call_event_end:
             try:
-                doc.reload()
+                doc = frappe.get_doc("Dennik hovorov", call_id)
                 update_call_event_end(doc, display_title=doc.klient)
             except Exception as e:
                 frappe.log_error(f"Failed to update Google Event: {e}", "BC End Error")
 
         return {"success": True}
 
-    except Exception as e:
+    except Exception:
+        frappe.db.rollback()
         frappe.log_error(traceback.format_exc(), "BC End Error")
         return {"success": False}
-
 
 # ----------------------------------------------------------------------
 # INVITE — prizvanie dalsieho ucastnika do prebiehajuceho hovoru
