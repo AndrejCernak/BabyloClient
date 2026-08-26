@@ -274,7 +274,10 @@ def start():
             "callId": call_doc.name,
             "callerId": auth_email,
             "callerName": display_name,
-            "title": "Prichádzajúci hovor"
+            "title": "Prichádzajúci hovor",
+            # Cas vzniku hovoru — appka podla neho zahodi stary push, ktory iOS
+            # doruci az pri dalsom spusteni (inak by po instalacii "zvonil duch").
+            "startedAt": int(now.timestamp()),
         }
         sent_count = 0
         callees_to_ring = [c for c in callee_ids if c != auth_email]
@@ -457,7 +460,8 @@ def invite():
             "callId": doc.name,
             "callerId": email,
             "callerName": inviter_meno or email,
-            "title": "Prichádzajúci hovor"
+            "title": "Prichádzajúci hovor",
+            "startedAt": int(now_datetime().timestamp()),
         }
         sent = _send_voip_to_user(invitee_docname, invitee_type, payload)
 
