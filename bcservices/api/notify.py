@@ -40,6 +40,11 @@ def send_notification():
 
     content = data.get("content", "Máte novú správu")
 
+    # Skupinová správa: v notifikácii je názov skupiny a v tele „Meno: text",
+    # aby bolo na prvý pohľad jasné, kam správa patrí.
+    group_id = data.get("group_id")
+    group_name = data.get("group_name")
+
     if not target_email:
         return {"success": False, "error": "Missing target_email"}
 
@@ -85,17 +90,24 @@ def send_notification():
     devices = user_doc.get("zariadenie") or []
     sent_count = 0
 
+    push_title = group_name or real_sender_name
+    push_body = f"{real_sender_name}: {content}" if group_id else content
+    custom_data = {
+        "email_from": sender_email,  # Aby iOS vedel otvoriť chat (používame email)
+        "type": "chat",
+    }
+    if group_id:
+        custom_data["group_id"] = group_id
+        custom_data["type"] = "group_chat"
+
     for d in devices:
         # Hľadáme 'apns_token' (nie voip_token!)
         if d.apns_token:
             success = send_chat_push(
                 device_token=d.apns_token,
-                title=real_sender_name,  # 🔥 TU použijeme pekné meno z databázy
-                body=content,            # Text správy
-                custom_data={
-                    "email_from": sender_email, # Aby iOS vedel otvoriť chat (používame email)
-                    "type": "chat"
-                },
+                title=push_title,
+                body=push_body,
+                custom_data=custom_data,
                 badge=new_badge          # Počet neprečítaných → ikona appky
             )
             if success:
