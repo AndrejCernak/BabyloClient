@@ -81,8 +81,11 @@ def send_notification():
     # 3. Zvýšime počítadlo neprečítaných PER ODOSIELATEĽ. Badge = súčet všetkých.
     #    Appka pri otvorení konkrétneho chatu zavolá mark_chat_read(from_user),
     #    čím sa odpočíta len tá jedna konverzácia (badge klesne presne o toľko).
+    # Neprečítané sa počítajú podľa odosielateľa; pri skupine podľa skupiny,
+    # aby sa dali vynulovať otvorením skupinového chatu (a nie súkromného).
+    unread_key = f"group:{group_id}" if group_id else sender_email
     unread_map = _load_unread_map(user_doc)
-    key = sender_email or "unknown"
+    key = unread_key or sender_email or "unknown"
     unread_map[key] = int(unread_map.get(key, 0)) + 1
     new_badge = _store_unread_map(doctype, user_doc.name, unread_map)
 
