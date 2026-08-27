@@ -6,12 +6,41 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": ["nazov", "kluc_clenov", "clenovia"],
+ "field_order": [
+  "nazov",
+  "kluc_clenov",
+  "hovor_id",
+  "clenovia"
+ ],
  "fields": [
-  {"fieldname": "nazov", "fieldtype": "Data", "label": "Názov", "in_list_view": 1},
-  {"fieldname": "kluc_clenov", "fieldtype": "Data", "label": "Kľúč členov", "read_only": 1, "search_index": 1,
-   "description": "Odtlačok zoznamu členov — rovnaká zostava ľudí nájde tú istú skupinu."},
-  {"fieldname": "clenovia", "fieldtype": "Table", "label": "Členovia", "options": "Clen skupiny"}
+  {
+   "fieldname": "nazov",
+   "fieldtype": "Data",
+   "label": "Názov",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kluc_clenov",
+   "fieldtype": "Data",
+   "label": "Kľúč členov",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Odtlačok zoznamu členov — rovnaká zostava ľudí nájde tú istú skupinu."
+  },
+  {
+   "fieldname": "hovor_id",
+   "fieldtype": "Data",
+   "label": "Hovor",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Posledný hovor, z ktorého sa skupina otvorila — aby sa všetci účastníci zišli v tej istej skupine."
+  },
+  {
+   "fieldname": "clenovia",
+   "fieldtype": "Table",
+   "label": "Členovia",
+   "options": "Clen skupiny"
+  }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
@@ -21,7 +50,16 @@
  "name": "Skupina",
  "owner": "Administrator",
  "permissions": [
-  {"create": 1, "delete": 1, "email": 1, "print": 1, "read": 1, "role": "System Manager", "share": 1, "write": 1}
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

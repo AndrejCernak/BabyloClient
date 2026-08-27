@@ -81,15 +81,41 @@ def ensure():
         if len(members) < 3:
             return {"success": False, "error": "Skupina potrebuje aspoň troch účastníkov"}
 
+        call_id = data.get("callId")
         key = _member_key(members)
+
+        # Ucastnici konferencie otvaraju chat v roznom case a vtedy uz moze byt
+        # v hovore niekto navyse -> podla samotnych clenov by kazdemu vysla INA
+        # skupina a spravy by sa rozdelili. Preto sa v ramci jedneho hovoru
+        # vsetci zidu v tej istej skupine a chybajuci sa do nej doplnia.
+        if call_id:
+            by_call = frappe.db.get_value("Skupina", {"hovor_id": call_id}, "name")
+            if by_call:
+                doc = frappe.get_doc("Skupina", by_call)
+                added = False
+                for m in members:
+                    if not _is_member(doc, m):
+                        doc.append("clenovia", {"email": m, "meno": _resolve_name(m) or m,
+                                                "pridany": now_datetime()})
+                        added = True
+                if added:
+                    doc.kluc_clenov = _member_key([r.email for r in doc.get("clenovia")])
+                    doc.save(ignore_permissions=True)
+                    frappe.db.commit()
+                return {"success": True, "group": _group_payload(doc)}
+
         existing = frappe.db.get_value("Skupina", {"kluc_clenov": key}, "name")
         if existing:
-            return {"success": True, "group": _group_payload(frappe.get_doc("Skupina", existing))}
+            doc = frappe.get_doc("Skupina", existing)
+            if call_id and doc.get("hovor_id") != call_id:
+                doc.db_set("hovor_id", call_id)
+            return {"success": True, "group": _group_payload(doc)}
 
         doc = frappe.get_doc({
             "doctype": "Skupina",
             "nazov": _auto_name(members),
             "kluc_clenov": key,
+            "hovor_id": call_id,
         })
         now = now_datetime()
         for m in members:
